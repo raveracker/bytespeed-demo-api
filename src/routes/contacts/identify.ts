@@ -30,60 +30,61 @@ routes.post("/identify", async (req: Request, res: Response) => {
     let linkPrecedence: string | null = null;
     let linkedContactId: number | null = null;
 
-    if (result.rows.length > 0) {
+    if (result.rows.length) {
       // Use the existing contact
       contactId = result.rows[0].id;
       linkedContactId = result.rows[0].linkedid;
       linkPrecedence = "secondary";
 
-      // Check if this should be switched to a secondary contact
-      if (
-        (result.rows[0].linkprecedence === "primary" &&
-          (email || phoneNumber) &&
-          email !== result.rows[0].email) ||
-        phoneNumber !== result.rows[0].phonenumber
-      ) {
-        // Update the existing contact to be a secondary contact
-        query = `
+      if (!(email === null || phoneNumber === null)) {
+        // Check if this should be switched to a secondary contact
+        if (
+          (result.rows[0].linkprecedence === "primary" &&
+            (email || phoneNumber) &&
+            email !== result.rows[0].email) ||
+          phoneNumber !== result.rows[0].phonenumber
+        ) {
+          // Update the existing contact to be a secondary contact
+          query = `
           UPDATE contacts
           SET linkPrecedence = 'secondary', linkedId = $2
           WHERE id = $1
         `;
-        result.rows
-          .filter((_, index) => index !== 0)
-          .map(
-            async (item: { id: number }) =>
-              await client.query(query, [item.id, contactId])
-          );
+          result.rows
+            .filter((_, index) => index !== 0)
+            .map(
+              async (item: { id: number }) =>
+                await client.query(query, [item.id, contactId])
+            );
 
-        // Create a new secondary contact only if it doesn't already exist
-        const existingSecondaryContactQuery = `
+          // Create a new secondary contact only if it doesn't already exist
+          const existingSecondaryContactQuery = `
           SELECT * FROM contacts 
           WHERE (email = $1 OR phoneNumber = $2) AND linkedId = $3 AND linkPrecedence = 'secondary'
         `;
-        const existingSecondaryContactResult = await client.query(
-          existingSecondaryContactQuery,
-          [email, phoneNumber, contactId]
-        );
 
-        if (
-          existingSecondaryContactResult.rows.length === 0 &&
-          result.rows.length === 0
-        ) {
-          query = `
-              INSERT INTO contacts (email, phoneNumber, linkedId, linkPrecedence)
-              VALUES ($1, $2, $3, $4)
-              RETURNING id, linkedid
-            `;
-          const secondaryContactResult = await client.query(query, [
-            email,
-            phoneNumber,
-            contactId,
-            linkPrecedence,
-          ]);
+          const existingSecondaryContactResult = await client.query(
+            existingSecondaryContactQuery,
+            [email, phoneNumber, contactId]
+          );
 
-          contactId = secondaryContactResult.rows[0].id;
-          linkedContactId = secondaryContactResult.rows[0].linkedid;
+          if (!existingSecondaryContactResult.rows.length) {
+            // Create a new secondary contact
+            query = `
+            INSERT INTO contacts (email, phoneNumber, linkedId, linkPrecedence)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, linkedid
+          `;
+            const secondaryContactResult = await client.query(query, [
+              email,
+              phoneNumber,
+              contactId,
+              linkPrecedence,
+            ]);
+
+            contactId = secondaryContactResult.rows[0].id;
+            linkedContactId = secondaryContactResult.rows[0].linkedid;
+          }
         }
       }
     } else {
