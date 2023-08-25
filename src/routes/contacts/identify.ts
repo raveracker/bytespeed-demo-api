@@ -39,10 +39,10 @@ routes.post("/identify", async (req: Request, res: Response) => {
       if (!(email === null || phoneNumber === null)) {
         // Check if this should be switched to a secondary contact
         if (
-          (result.rows[0].linkprecedence === "primary" &&
-            (email || phoneNumber) &&
-            email !== result.rows[0].email) ||
-          phoneNumber !== result.rows[0].phonenumber
+          result.rows[0].linkprecedence === "primary" &&
+          (email || phoneNumber) &&
+          (email !== result.rows[0].email ||
+            phoneNumber !== result.rows[0].phonenumber)
         ) {
           // Update the existing contact to be a secondary contact
           query = `
