@@ -1,12 +1,6 @@
 import { Request, Response } from "express";
 import db from "../../db";
-import {
-  isValidEmail,
-  isValidPhoneNumber,
-  createContactsTable,
-  getLinkedContacts,
-  routes,
-} from "../../utils";
+import { createContactsTable, getLinkedContacts, routes } from "../../utils";
 
 routes.post("/identify", async (req: Request, res: Response) => {
   const { email, phoneNumber } = req.body;
@@ -21,14 +15,6 @@ routes.post("/identify", async (req: Request, res: Response) => {
       return res
         .status(400)
         .json({ error: "Email or phoneNumber is required." });
-    }
-
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ error: "Invalid Email." });
-    }
-
-    if (!isValidPhoneNumber(phoneNumber)) {
-      return res.status(400).json({ error: "Invalid Phone Number." });
     }
 
     const client = await db.connect();
@@ -80,8 +66,10 @@ routes.post("/identify", async (req: Request, res: Response) => {
           [email, phoneNumber, contactId]
         );
 
-        if (existingSecondaryContactResult.rows.length === 0) {
-          console.log("Caalll thissss");
+        if (
+          existingSecondaryContactResult.rows.length === 0 &&
+          result.rows.length === 0
+        ) {
           query = `
               INSERT INTO contacts (email, phoneNumber, linkedId, linkPrecedence)
               VALUES ($1, $2, $3, $4)
